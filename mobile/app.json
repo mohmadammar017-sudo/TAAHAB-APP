@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Taahab",
+    "slug": "taahab",
+    "version": "1.0.0",
+    "entryPoint": "./index.js",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.taahab.demo"
+    },
+    "ios": {
+      "bundleIdentifier": "com.taahab.demo"
+    },
+    "extra": {
+      "projectName": "Taahab MVP"
+    }
+  }
+}
