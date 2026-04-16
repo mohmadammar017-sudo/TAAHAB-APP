@@ -7,6 +7,7 @@ interface HomeScreenProps {
   isConnected: boolean;
   networkModeLabel: string;
   pendingAlertsCount: number;
+  onBackToApp?: () => void;
   onCreateAlert: () => void;
   onOpenInbox: () => void;
   onToggleConnectivity: () => void;
@@ -16,12 +17,24 @@ export default function HomeScreen({
   isConnected,
   networkModeLabel,
   pendingAlertsCount,
+  onBackToApp,
   onCreateAlert,
   onOpenInbox,
   onToggleConnectivity
 }: HomeScreenProps) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {onBackToApp ? (
+        <View style={styles.topBar}>
+          <Pressable onPress={onOpenInbox}>
+            <Text style={styles.topBarLink}>الحافظة</Text>
+          </Pressable>
+          <Pressable onPress={onBackToApp}>
+            <Text style={styles.topBarLink}>العودة إلى أبشر</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.heroCard}>
         <Text style={styles.overline}>Offline Emergency Relay Feature</Text>
         <Text style={styles.title}>تأهّب</Text>
@@ -30,11 +43,12 @@ export default function HomeScreen({
           أنشئ البلاغ، خزّنه محليًا، مرّره بين الأجهزة القريبة، وارفعه لاحقًا عندما يظهر الاتصال.
         </Text>
 
+        <View style={styles.shakeHint}>
+          <Text style={styles.shakeHintText}>يمكن فتح تأهّب مباشرة بهزّ الجوال من واجهة أبشر</Text>
+        </View>
+
         <View style={styles.statusRow}>
-          <StatusBadge
-            label={isConnected ? "متصل" : "غير متصل"}
-            tone={isConnected ? "success" : "warning"}
-          />
+          <StatusBadge label={isConnected ? "متصل" : "غير متصل"} tone={isConnected ? "success" : "warning"} />
           <StatusBadge label={`وضع ${networkModeLabel}`} tone="info" />
         </View>
       </View>
@@ -89,6 +103,16 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 18
   },
+  topBar: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between"
+  },
+  topBarLink: {
+    color: colors.info,
+    fontSize: 14,
+    fontWeight: "700",
+    writingDirection: "rtl"
+  },
   heroCard: {
     backgroundColor: colors.panelElevated,
     borderWidth: 1,
@@ -123,6 +147,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     textAlign: "right",
+    writingDirection: "rtl"
+  },
+  shakeHint: {
+    alignSelf: "flex-end",
+    backgroundColor: colors.accentSoft,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  shakeHintText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "800",
     writingDirection: "rtl"
   },
   statusRow: {
@@ -196,4 +233,3 @@ const styles = StyleSheet.create({
     opacity: 0.9
   }
 });
-

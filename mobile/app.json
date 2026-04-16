@@ -3,7 +3,6 @@
     "name": "Taahab",
     "slug": "taahab",
     "version": "1.0.0",
-    "entryPoint": "./index.js",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [

@@ -13,6 +13,10 @@
     "dev:dashboard": "npm --workspace dashboard run dev",
     "build:server": "npm --workspace server run build",
     "build:dashboard": "npm --workspace dashboard run build"
+  },
+  "devDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-native": "^0.81.5"
   }
 }
-

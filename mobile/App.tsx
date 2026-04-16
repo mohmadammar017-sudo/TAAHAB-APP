@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { SafeAreaView, StatusBar, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SafeAreaView, StatusBar, StyleSheet, Text, View } from "react-native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import AbsherShellScreen, { type AbsherTabKey } from "./src/screens/AbsherShellScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import CreateAlertScreen from "./src/screens/CreateAlertScreen";
 import RelayStatusScreen from "./src/screens/RelayStatusScreen";
@@ -17,14 +18,16 @@ import {
 import { getCurrentNetworkStatus, resolveEffectiveNetworkStatus } from "./src/services/networkService";
 import { getAllAlerts, saveAlert } from "./src/services/storageService";
 import { getApiBaseUrl, syncPendingAlerts } from "./src/services/syncService";
+import { subscribeToShake } from "./src/services/shakeService";
 import { colors } from "./src/theme";
 import type { AlertPacket, CreateAlertInput } from "./src/types/alert";
 import type { MeshDevice } from "./src/types/device";
 
-type ScreenName = "home" | "create" | "relay" | "inbox";
+type ScreenName = "absher" | "home" | "create" | "relay" | "inbox";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>("home");
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>("absher");
+  const [activeAbsherTab, setActiveAbsherTab] = useState<AbsherTabKey>("home");
   const [alerts, setAlerts] = useState<AlertPacket[]>([]);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [realNetworkConnected, setRealNetworkConnected] = useState(false);
@@ -33,6 +36,8 @@ export default function App() {
   const [creatingAlert, setCreatingAlert] = useState(false);
   const [nearbyDevice, setNearbyDevice] = useState<MeshDevice | null>(null);
   const [devices, setDevices] = useState<MeshDevice[]>(createDemoDevices());
+  const [shakeNoticeVisible, setShakeNoticeVisible] = useState(false);
+  const currentScreenRef = useRef<ScreenName>("absher");
 
   const effectiveIsConnected = useMemo(
     () => resolveEffectiveNetworkStatus(realNetworkConnected, networkOverride),
@@ -40,11 +45,14 @@ export default function App() {
   );
 
   const networkModeLabel = networkOverride === null ? "فعلي" : "محاكاة";
+  const isShellScreen = currentScreen === "absher";
 
   const selectedAlert = useMemo(
     () => alerts.find((alert) => alert.id === selectedAlertId) ?? null,
     [alerts, selectedAlertId]
   );
+
+  const latestAlert = useMemo(() => alerts[0] ?? null, [alerts]);
 
   const pendingAlertsCount = useMemo(
     () => alerts.filter((alert) => alert.status !== "synced").length,
@@ -61,9 +69,7 @@ export default function App() {
     }
 
     setSelectedAlertId((current) =>
-      current && storedAlerts.some((alert) => alert.id === current)
-        ? current
-        : storedAlerts[0].id
+      current && storedAlerts.some((alert) => alert.id === current) ? current : storedAlerts[0].id
     );
   }, []);
 
@@ -93,6 +99,10 @@ export default function App() {
   }, [refreshAlerts, refreshNetwork]);
 
   useEffect(() => {
+    currentScreenRef.current = currentScreen;
+  }, [currentScreen]);
+
+  useEffect(() => {
     if (!selectedAlert) {
       setNearbyDevice(null);
       return;
@@ -102,6 +112,32 @@ export default function App() {
       syncDeviceAvailability(currentDevices, selectedAlert.currentDeviceId)
     );
   }, [selectedAlert]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToShake(() => {
+      if (currentScreenRef.current !== "absher") {
+        return;
+      }
+
+      setActiveAbsherTab("home");
+      setCurrentScreen("home");
+      setShakeNoticeVisible(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!shakeNoticeVisible) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShakeNoticeVisible(false);
+    }, 2200);
+
+    return () => clearTimeout(timeout);
+  }, [shakeNoticeVisible]);
 
   const handleCreateAlert = useCallback(
     async (input: CreateAlertInput) => {
@@ -120,6 +156,11 @@ export default function App() {
     },
     [refreshAlerts]
   );
+
+  const openRelayForAlert = useCallback((alertId: string) => {
+    setSelectedAlertId(alertId);
+    setCurrentScreen("relay");
+  }, []);
 
   const handleStartSearch = useCallback(async () => {
     if (!selectedAlert) {
@@ -257,11 +298,7 @@ export default function App() {
     const nextValue = !(networkOverride ?? realNetworkConnected);
     setNetworkOverride(nextValue);
     setDevices((currentDevices) =>
-      flagDeviceInternet(
-        currentDevices,
-        selectedAlert?.currentDeviceId ?? DEFAULT_DEVICE_ID,
-        nextValue
-      )
+      flagDeviceInternet(currentDevices, selectedAlert?.currentDeviceId ?? DEFAULT_DEVICE_ID, nextValue)
     );
     await refreshNetwork();
   }, [networkOverride, realNetworkConnected, refreshNetwork, selectedAlert]);
@@ -272,17 +309,50 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ExpoStatusBar style="light" />
-      <StatusBar barStyle="light-content" />
-      <View style={styles.backgroundGlowTop} />
-      <View style={styles.backgroundGlowBottom} />
+    <SafeAreaView style={[styles.safeArea, isShellScreen && styles.safeAreaShell]}>
+      <ExpoStatusBar style={isShellScreen ? "dark" : "light"} />
+      <StatusBar
+        barStyle={isShellScreen ? "dark-content" : "light-content"}
+        backgroundColor={isShellScreen ? "#F3F6F4" : colors.background}
+      />
+
+      {!isShellScreen ? <View style={styles.backgroundGlowTop} /> : null}
+      {!isShellScreen ? <View style={styles.backgroundGlowBottom} /> : null}
+
+      {shakeNoticeVisible ? (
+        <View style={styles.shakeBanner}>
+          <Text style={styles.shakeBannerText}>تم فتح تأهّب عبر هزّ الجهاز</Text>
+        </View>
+      ) : null}
+
+      {currentScreen === "absher" ? (
+        <AbsherShellScreen
+          activeTab={activeAbsherTab}
+          isConnected={effectiveIsConnected}
+          pendingAlertsCount={pendingAlertsCount}
+          latestAlert={latestAlert}
+          onChangeTab={setActiveAbsherTab}
+          onOpenTaahab={() => setCurrentScreen("home")}
+          onCreateAlert={() => setCurrentScreen("create")}
+          onOpenInbox={() => setCurrentScreen("inbox")}
+          onOpenLatestAlert={() => {
+            if (latestAlert) {
+              openRelayForAlert(latestAlert.id);
+              return;
+            }
+
+            setCurrentScreen("home");
+          }}
+          onToggleConnectivity={handleToggleConnectivity}
+        />
+      ) : null}
 
       {currentScreen === "home" ? (
         <HomeScreen
           isConnected={effectiveIsConnected}
           networkModeLabel={networkModeLabel}
           pendingAlertsCount={pendingAlertsCount}
+          onBackToApp={() => setCurrentScreen("absher")}
           onCreateAlert={() => setCurrentScreen("create")}
           onOpenInbox={() => setCurrentScreen("inbox")}
           onToggleConnectivity={handleToggleConnectivity}
@@ -336,6 +406,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
+  safeAreaShell: {
+    backgroundColor: "#F3F6F4"
+  },
   backgroundGlowTop: {
     position: "absolute",
     top: -160,
@@ -353,5 +426,25 @@ const styles = StyleSheet.create({
     height: 320,
     borderRadius: 320,
     backgroundColor: "rgba(121, 207, 255, 0.08)"
+  },
+  shakeBanner: {
+    position: "absolute",
+    top: 18,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    backgroundColor: "rgba(7, 23, 18, 0.94)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 224, 138, 0.34)",
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16
+  },
+  shakeBannerText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
+    writingDirection: "rtl"
   }
 });
